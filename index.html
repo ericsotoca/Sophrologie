@@ -107,7 +107,7 @@
          try {
             console.log(`[readStoryMobile] Cancelling existing speech for ${id}`); window.speechSynthesis.cancel();
             const mobileUtterance = new SpeechSynthesisUtterance(); mobileUtterance.lang = 'fr-FR';
-            const paragraphs = text.split('\n').filter(p => p.trim().length > 0); let currentParagraphIndex = 0; let isStoppedManually = false; let nextParagraphTimeoutId = null;
+            const paragraphs = text.split('[PAUSE]').filter(p => p.trim().length > 0); let currentParagraphIndex = 0; let isStoppedManually = false; let nextParagraphTimeoutId = null;
             const speakNextParagraph = () => {
                 const storyData = speechSynthesisMap[id];
                 if (!storyData || isStoppedManually || currentParagraphIndex >= paragraphs.length || currentlyPlaying !== id) { console.log(`[speakNextParagraph][${id}] Stopping. Reason: stopped=${isStoppedManually}, index=${currentParagraphIndex}, paragraphs=${paragraphs.length}, current=${currentlyPlaying}`); if (!isStoppedManually && currentlyPlaying === id) { resetStoryState(id); } return; }
@@ -116,7 +116,14 @@
                 const voices = window.speechSynthesis.getVoices(); const frenchVoice = voices.find(voice => voice.lang.includes('fr')); if (frenchVoice) mobileUtterance.voice = frenchVoice;
                 mobileUtterance.onend = () => {
                     console.log(`[speakNextParagraph][${id}] onend: Paragraph ${currentParagraphIndex + 1} finished.`); const currentStoryData = speechSynthesisMap[id];
-                    if (currentStoryData && !currentStoryData.isPaused && !isStoppedManually && currentlyPlaying === id) { currentParagraphIndex++; console.log(`[speakNextParagraph][${id}] onend: Scheduling next paragraph (${currentParagraphIndex + 1})`); if (nextParagraphTimeoutId) clearTimeout(nextParagraphTimeoutId); nextParagraphTimeoutId = setTimeout(speakNextParagraph, 75); } else { console.log(`[speakNextParagraph][${id}] onend: Not scheduling next paragraph. isPaused=${currentStoryData?.isPaused}, stopped=${isStoppedManually}, current=${currentlyPlaying}`); if (currentParagraphIndex >= paragraphs.length - 1 && !currentStoryData?.isPaused && !isStoppedManually && currentlyPlaying === id) { resetStoryState(id); } }
+                    if (currentStoryData && !currentStoryData.isPaused && !isStoppedManually && currentlyPlaying === id) { 
+                        currentParagraphIndex++; 
+                        if (nextParagraphTimeoutId) clearTimeout(nextParagraphTimeoutId); 
+                        nextParagraphTimeoutId = setTimeout(speakNextParagraph, 10000); // Pause for 10 seconds
+                    } else { 
+                        console.log(`[speakNextParagraph][${id}] onend: Not scheduling next paragraph. isPaused=${currentStoryData?.isPaused}, stopped=${isStoppedManually}, current=${currentlyPlaying}`); 
+                        if (currentParagraphIndex >= paragraphs.length - 1 && !currentStoryData?.isPaused && !isStoppedManually && currentlyPlaying === id) { resetStoryState(id); } 
+                    }
                 };
                 mobileUtterance.onerror = (event) => { console.error(`[speakNextParagraph][${id}] onerror: Paragraph ${currentParagraphIndex + 1}. Error: ${event.error}`, event); isStoppedManually = true; resetStoryState(id); };
                 if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) { console.log(`[speakNextParagraph][${id}] Calling speak() for paragraph ${currentParagraphIndex + 1}`); window.speechSynthesis.speak(mobileUtterance); } else { console.warn(`[speakNextParagraph][${id}] Synthesis busy, retrying paragraph ${currentParagraphIndex + 1} shortly.`); if (nextParagraphTimeoutId) clearTimeout(nextParagraphTimeoutId); nextParagraphTimeoutId = setTimeout(speakNextParagraph, 300); }
